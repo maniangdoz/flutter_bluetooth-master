@@ -160,7 +160,7 @@ class _BluetoothAppState extends State<BluetoothApp> {
                 color: Colors.white,
               ),
               label: Text(
-                "Refresh",
+                "Actualiser",
                 style: TextStyle(
                   color: Colors.white,
                 ),
