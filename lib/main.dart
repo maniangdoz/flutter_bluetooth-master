@@ -27,7 +27,7 @@ class BluetoothApp extends StatefulWidget {
   _BluetoothAppState createState() => _BluetoothAppState();
 }
 
-class _BluetoothAppState extends State<BluetoothApp> {
+class _BluetoothAppState extends State<BluetoothApp>{
   // Initializing the Bluetooth connection state to be unknown
   BluetoothState _bluetoothState = BluetoothState.UNKNOWN;
   // Initializing a global key, as it would help us in showing a SnackBar later
@@ -55,20 +55,24 @@ class _BluetoothAppState extends State<BluetoothApp> {
 
   // Define some variables, which will be required later
   List<BluetoothDevice> _devicesList = [];
-  BluetoothDevice _device;
+  BluetoothDevice _device ;
   bool _connected = false;
   bool _isButtonUnavailable = false;
 
   @override
   void initState() {
     super.initState();
-
+    print(isConnected);
     // Get current state
-    FlutterBluetoothSerial.instance.state.then((state) {
-      setState(() {
-        _bluetoothState = state;
+    try {
+      FlutterBluetoothSerial.instance.state.then((state) {
+        setState(() {
+          _bluetoothState = state;
+        });
       });
-    });
+    } on Exception catch (e) {
+      print('erreur 5 : $e');
+    }
 
     _deviceState = 0; // neutral
 
@@ -78,17 +82,21 @@ class _BluetoothAppState extends State<BluetoothApp> {
     enableBluetooth();
 
     // Listen for further state changes
-    FlutterBluetoothSerial.instance
-        .onStateChanged()
-        .listen((BluetoothState state) {
-      setState(() {
-        _bluetoothState = state;
-        if (_bluetoothState == BluetoothState.STATE_OFF) {
-          _isButtonUnavailable = true;
-        }
-        getPairedDevices();
+    try {
+      FlutterBluetoothSerial.instance
+          .onStateChanged()
+          .listen((BluetoothState state) {
+        setState(() {
+          _bluetoothState = state;
+          if (_bluetoothState == BluetoothState.STATE_OFF) {
+            _isButtonUnavailable = true;
+          }
+          getPairedDevices();
+        });
       });
-    });
+    } on Exception catch (e) {
+      print('erreur 4 $e');
+    }
   }
 
   @override
@@ -106,16 +114,24 @@ class _BluetoothAppState extends State<BluetoothApp> {
   // Request Bluetooth permission from the user
   Future<void> enableBluetooth() async {
     // Retrieving the current Bluetooth state
-    _bluetoothState = await FlutterBluetoothSerial.instance.state;
+    try {
+      _bluetoothState = await FlutterBluetoothSerial.instance.state;
+    } on Exception catch (e) {
+      print('erreur 9 : $e');
+    }
 
     // If the bluetooth is off, then turn it on first
     // and then retrieve the devices that are paired.
-    if (_bluetoothState == BluetoothState.STATE_OFF) {
-      await FlutterBluetoothSerial.instance.requestEnable();
-      await getPairedDevices();
-      return true;
-    } else {
-      await getPairedDevices();
+    try {
+      if (_bluetoothState == BluetoothState.STATE_OFF) {
+        await FlutterBluetoothSerial.instance.requestEnable();
+        await getPairedDevices();
+        return true;
+      } else {
+        await getPairedDevices();
+      }
+    } on Exception catch (e) {
+      print('Erreur 8 : $e');
     }
     return false;
   }
@@ -173,9 +189,13 @@ class _BluetoothAppState extends State<BluetoothApp> {
                 // So, that when new devices are paired
                 // while the app is running, user can refresh
                 // the paired devices list.
-                await getPairedDevices().then((_) {
-                  show('Device list refreshed');
-                });
+                try {
+                  await getPairedDevices().then((_) {
+                    show('Device list refreshed');
+                  });
+                } on Exception catch (e) {
+                  print('Erreur 7 : $e');
+                }
               },
             ),
           ],
@@ -302,8 +322,12 @@ class _BluetoothAppState extends State<BluetoothApp> {
                         RaisedButton(
                           elevation: 2,
                           child: Text("Bluetooth Settings"),
-                          onPressed: () {
-                            FlutterBluetoothSerial.instance.openSettings();
+                          onPressed: () async {
+                            try {
+                              await FlutterBluetoothSerial.instance.openSettings();
+                            } on Exception catch (e) {
+                              print('Erreur 6 : $e');
+                            }
                           },
                         ),
                       ],
@@ -326,12 +350,19 @@ class _BluetoothAppState extends State<BluetoothApp> {
         child: Text('Vide'),
       ));
     } else {
-      _devicesList.forEach((device) {
+      if(_connected){
         items.add(DropdownMenuItem(
-          child: Text(device.name),
-          value: device,
+            child: Text(_device.name),
+            value: _device,
         ));
-      });
+      }else{
+        _devicesList.forEach((device) {
+          items.add(DropdownMenuItem(
+            child: Text(device.name),
+            value: device,
+          ));
+        });
+      }
     }
     return items;
   }
@@ -345,62 +376,50 @@ class _BluetoothAppState extends State<BluetoothApp> {
       show('Aucun appareil sélectionné');
     } else {
       if (!isConnected) {
-        await BluetoothConnection.toAddress(_device.address)
-            .then((_connection) {
-          print('Connected to the device');
-          show('Appareil connecté');
-          connection = _connection;
-          setState(() {
-            _connected = true;
+
+        try{
+          await BluetoothConnection.toAddress(_device.address)
+              .then((_connection) {
+            print('Connected to the device');
+            connection = _connection;
+            setState(() {
+              _connected = true;
+            });
+
+            try{
+              connection.input.listen(null).onDone(() {
+                try {
+                  if (isDisconnecting) {
+                    print('Disconnecting locally!');
+                  } else {
+                    print('Disconnected remotely!');
+                    show('Déconnexion à distance...');
+                  }
+                  if (this.mounted) {
+                    setState(() {});
+                  }
+                } on Exception catch (e) {
+                  print('erreur 3 : $e');
+                }
+              });
+            }catch(Exception){
+              print("Erreur 2 : $Exception");
+            }
+
+          }).catchError((error) {
+            print('Cannot connect, exception occurred');
+            // show('Connexion impossible');
+            print(error);
           });
 
-          connection.input.listen(null).onDone(() {
-            if (isDisconnecting) {
-              print('Disconnecting locally!');
-            } else {
-              print('Disconnected remotely!');
-              show('Déconnexion à distance...');
-            }
-            if (this.mounted) {
-              setState(() {});
-            }
-          });
-        }).catchError((error) {
-          print('Cannot connect, exception occurred');
-          show('Connexion impossible');
-          print(error);
-        });
+        }catch(Exception){
+          print('Erreur 1 : $Exception');
+        }
 
         setState(() => _isButtonUnavailable = false);
       }
     }
   }
-
-  // void _onDataReceived(Uint8List data) {
-  //   // Allocate buffer for parsed data
-  //   int backspacesCounter = 0;
-  //   data.forEach((byte) {
-  //     if (byte == 8 || byte == 127) {
-  //       backspacesCounter++;
-  //     }
-  //   });
-  //   Uint8List buffer = Uint8List(data.length - backspacesCounter);
-  //   int bufferIndex = buffer.length;
-
-  //   // Apply backspace control character
-  //   backspacesCounter = 0;
-  //   for (int i = data.length - 1; i >= 0; i--) {
-  //     if (data[i] == 8 || data[i] == 127) {
-  //       backspacesCounter++;
-  //     } else {
-  //       if (backspacesCounter > 0) {
-  //         backspacesCounter--;
-  //       } else {
-  //         buffer[--bufferIndex] = data[i];
-  //       }
-  //     }
-  //   }
-  // }
 
   // Method to disconnect bluetooth
   void _disconnect() async {
