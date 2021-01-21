@@ -64,6 +64,8 @@ class _BluetoothAppState extends State<BluetoothApp>{
     super.initState();
     print(isConnected);
     // Get current state
+
+
     try {
       FlutterBluetoothSerial.instance.state.then((state) {
         setState(() {
@@ -381,6 +383,7 @@ class _BluetoothAppState extends State<BluetoothApp>{
           await BluetoothConnection.toAddress(_device.address)
               .then((_connection) {
             print('Connected to the device');
+            show('Connected to the device');
             connection = _connection;
             setState(() {
               _connected = true;
